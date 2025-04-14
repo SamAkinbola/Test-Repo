@@ -9,7 +9,7 @@ on:
       - merged
       
     branches:
-      - dev
+      - develop
     paths:
       - 'SNOWFLAKE/**'
 # Allows you to run this workflow manually from the Actions tab
