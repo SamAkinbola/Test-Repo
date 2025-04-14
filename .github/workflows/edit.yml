@@ -2,8 +2,10 @@
 name: PULL REQUEST WORKFLOW
 
 # Controls when the action will run. 
-
 on:
+  push:
+    branches:
+      - test
   pull_request:
     types:
       - merged
