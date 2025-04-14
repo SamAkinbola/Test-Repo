@@ -4,12 +4,13 @@ name: PULL REQUEST WORKFLOW
 # Controls when the action will run. 
 
 on:
+  push:
+    branches:
+      - dev
   pull_request:
     types:
       - merged
       
-    branches:
-      - dev
     paths:
       - 'SNOWFLAKE/**'
 # Allows you to run this workflow manually from the Actions tab
