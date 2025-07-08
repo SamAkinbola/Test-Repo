@@ -19,7 +19,7 @@ jobs:
           & "${env:SystemRoot}\system32\WindowsPowerShell\v1.0\powershell.exe" -Command "Install-Module -Name ReportingServicesTools -Scope CurrentUser -Force"
       - name: Deploy SSRS Reports
         run: |
-          $sourceFolder = "${{ github.workspace }}\${{ env.WORKING_DIRECTORY }}SSRS\Reports\TrackerReports"
+          $sourceFolder = "${{ github.workspace }}\${{ env.WORKING_DIRECTORY }}RDL"
           $targetReportServerUri = "${{ env.SSRS_SERVER }}"
-          $targetFolder = "/TrackerReports"
+          $targetFolder = "/RDLReports"
           Write-RsFolderContent -ReportServerUri $targetReportServerUri -Path $sourceFolder -Destination $targetFolder -Overwrite
