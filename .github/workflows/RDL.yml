@@ -8,7 +8,7 @@ on:
     inputs:
       report_name:
         description: 'Name of the report to deploy'
-        required: false
+        required: true
 
 jobs:
   deploy:
