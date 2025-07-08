@@ -8,7 +8,7 @@ on:
     inputs:
       report_name:
         description: 'Name of the report to deploy'
-        required: true
+        required: false
 
 jobs:
   deploy:
@@ -18,12 +18,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install ReportingServicesTools module
-        run: |
-          & "${env:SystemRoot}\system32\WindowsPowerShell\v1.0\powershell.exe" -Command "Install-Module -Name ReportingServicesTools -Scope CurrentUser -Force"
-
       - name: Deploy SSRS Reports
         run: |
+          # Install ReportingServicesTools module if not already available
+          if (-not (Get-Module -ListAvailable -Name ReportingServicesTools)) {
+            Install-Module -Name ReportingServicesTools -Scope CurrentUser -Force
+          }
+
+          # Import module into the current session
+          Import-Module ReportingServicesTools
+
+          # Define paths and inputs
           $sourceFolder = "${{ github.workspace }}\RDL"
           $targetReportServerUri = "http://your-ssrs-server/ReportServer"
           $targetFolder = "/TrackerReports"
@@ -35,7 +40,7 @@ jobs:
             exit 1
           }
 
-          # If report_name is provided, deploy that single report
+          # Deploy single report if specified
           if (-not [string]::IsNullOrEmpty($reportName)) {
             $reportPath = Join-Path $sourceFolder "$reportName.rdl"
             if (-not (Test-Path $reportPath)) {
@@ -46,13 +51,14 @@ jobs:
             Write-RsCatalogItem -Path $reportPath -ReportServerUri $targetReportServerUri -Destination "$targetFolder/$reportName" -OverWrite
           }
           else {
-            # Deploy all RDL files in the folder
+            # Deploy all RDL files in source folder
             Get-ChildItem -Path $sourceFolder -Filter *.rdl | ForEach-Object {
               $destinationPath = "$targetFolder/$($_.BaseName)"
               Write-Output "Deploying report: $($_.FullName) to $destinationPath"
               Write-RsCatalogItem -Path $_.FullName -ReportServerUri $targetReportServerUri -Destination $destinationPath -OverWrite
             }
           }
+        shell: pwsh
         env:
           SSRS_USERNAME: ${{ secrets.SSRS_USERNAME }}
           SSRS_PASSWORD: ${{ secrets.SSRS_PASSWORD }}
