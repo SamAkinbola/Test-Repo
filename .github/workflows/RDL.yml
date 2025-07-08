@@ -1,25 +1,38 @@
 name: Deploy SSRS Reports
+
 on:
+  push:
+    branches:
+      - prod
   workflow_dispatch:
     inputs:
       report_name:
         description: 'Name of the report to deploy'
-        required: true
-env:
-  WORKING_DIRECTORY: './'
-  SSRS_SERVER: 'http://reportingservices.abc.com/ReportServer'
+        required: false
+
 jobs:
   deploy:
     runs-on: windows-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Install ReportingServicesTools module
         run: |
           & "${env:SystemRoot}\system32\WindowsPowerShell\v1.0\powershell.exe" -Command "Install-Module -Name ReportingServicesTools -Scope CurrentUser -Force"
+
       - name: Deploy SSRS Reports
         run: |
-          $sourceFolder = "${{ github.workspace }}\${{ env.WORKING_DIRECTORY }}RDL"
-          $targetReportServerUri = "${{ env.SSRS_SERVER }}"
-          $targetFolder = "/RDLReports"
-          Write-RsFolderContent -ReportServerUri $targetReportServerUri -Path $sourceFolder -Destination $targetFolder -Overwrite
+          $sourceFolder = "${{ github.workspace }}\RDL"
+          $targetReportServerUri = "http://your-ssrs-server/ReportServer"
+          $targetFolder = "/TrackerReports"
+          $reportName = "${{ github.event.inputs.report_name }}"
+          if (-not [string]::IsNullOrEmpty($reportName)) {
+            $reportPath = Join-Path $sourceFolder "$reportName.rdl"
+            Write-RsCatalogItem -Path $reportPath -ReportServerUri $targetReportServerUri -Destination "$targetFolder/$reportName" -OverWrite
+          } else {
+            Write-RsFolderContent -Path $sourceFolder -ReportServerUri $targetReportServerUri -Destination $targetFolder -OverWrite
+          }
+        env:
+          SSRS_USERNAME: ${{ secrets.SSRS_USERNAME }}
+          SSRS_PASSWORD: ${{ secrets.SSRS_PASSWORD }}
