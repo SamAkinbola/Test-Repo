@@ -1,0 +1,25 @@
+name: Deploy SSRS Reports
+on:
+  workflow_dispatch:
+    inputs:
+      report_name:
+        description: 'Name of the report to deploy'
+        required: true
+env:
+  WORKING_DIRECTORY: './'
+  SSRS_SERVER: 'http://reportingservices.abc.com/ReportServer'
+jobs:
+  deploy:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Install ReportingServicesTools module
+        run: |
+          & "${env:SystemRoot}\system32\WindowsPowerShell\v1.0\powershell.exe" -Command "Install-Module -Name ReportingServicesTools -Scope CurrentUser -Force"
+      - name: Deploy SSRS Reports
+        run: |
+          $sourceFolder = "${{ github.workspace }}\${{ env.WORKING_DIRECTORY }}SSRS\Reports\TrackerReports"
+          $targetReportServerUri = "${{ env.SSRS_SERVER }}"
+          $targetFolder = "/TrackerReports"
+          Write-RsFolderContent -ReportServerUri $targetReportServerUri -Path $sourceFolder -Destination $targetFolder -Overwrite
