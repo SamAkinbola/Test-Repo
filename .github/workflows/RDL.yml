@@ -13,6 +13,7 @@ on:
 jobs:
   deploy:
     runs-on: windows-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,11 +28,30 @@ jobs:
           $targetReportServerUri = "http://your-ssrs-server/ReportServer"
           $targetFolder = "/TrackerReports"
           $reportName = "${{ github.event.inputs.report_name }}"
+
+          # Validate source folder
+          if (-not (Test-Path $sourceFolder)) {
+            Write-Error "Source folder not found: $sourceFolder"
+            exit 1
+          }
+
+          # If report_name is provided, deploy that single report
           if (-not [string]::IsNullOrEmpty($reportName)) {
             $reportPath = Join-Path $sourceFolder "$reportName.rdl"
+            if (-not (Test-Path $reportPath)) {
+              Write-Error "Specified report not found: $reportPath"
+              exit 1
+            }
+            Write-Output "Deploying report: $reportPath"
             Write-RsCatalogItem -Path $reportPath -ReportServerUri $targetReportServerUri -Destination "$targetFolder/$reportName" -OverWrite
-          } else {
-            Write-RsFolderContent -Path $sourceFolder -ReportServerUri $targetReportServerUri -Destination $targetFolder -OverWrite
+          }
+          else {
+            # Deploy all RDL files in the folder
+            Get-ChildItem -Path $sourceFolder -Filter *.rdl | ForEach-Object {
+              $destinationPath = "$targetFolder/$($_.BaseName)"
+              Write-Output "Deploying report: $($_.FullName) to $destinationPath"
+              Write-RsCatalogItem -Path $_.FullName -ReportServerUri $targetReportServerUri -Destination $destinationPath -OverWrite
+            }
           }
         env:
           SSRS_USERNAME: ${{ secrets.SSRS_USERNAME }}
