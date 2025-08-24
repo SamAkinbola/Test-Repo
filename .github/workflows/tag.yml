@@ -1,24 +1,44 @@
-name: TAG DEPLOYMENT WORKFLOW
+name: PULL REQUEST WORKFLOW
+
 on:
   push:
     tags:
-      - "v*.."
-  workflow_dispatch:
+      - "v*"   # Run only when pushing version tags
+
 jobs:
   deploy-snowflake-changes-job:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Log trigger details
-        run: |
-          echo "Event: ${{ github.event_name }}"
-          echo "Ref: ${{ github.ref }}"
-          echo "Commit SHA: ${{ github.sha }}"
-          git diff --name-only HEAD^ HEAD || echo "No diff available"
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          python-version: "3.8"
+          fetch-depth: 0   # needed so we can check branches containing the commit
+
+      - name: Ensure tag commit is on prod branch
+        id: branch_check
+        run: |
+          COMMIT_SHA=${{ github.sha }}
+          if git branch -r --contains "$COMMIT_SHA" | grep -q "origin/prod"; then
+            echo "on_prod=true" >> $GITHUB_OUTPUT
+          else
+            echo "on_prod=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Stop if tag not from prod
+        if: steps.branch_check.outputs.on_prod != 'true'
+        run: |
+          echo "❌ This tag was not created from prod branch. Skipping workflow."
+          exit 0
+
+      - name: Use Python 3.8.x
+        if: steps.branch_check.outputs.on_prod == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.8'
+
       - name: Run schemachange
+        if: steps.branch_check.outputs.on_prod == 'true'
         env:
           SF_ACCOUNT: ${{ secrets.SF_ACCOUNT }}
           SF_USERNAME: ${{ secrets.SF_USERNAME }}
@@ -27,7 +47,14 @@ jobs:
           SF_DATABASE: ${{ secrets.SF_DATABASE }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SF_PASSWORD }}
         run: |
-          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
-          python --version
+          echo "Tag created from prod branch ✅"
           pip install schemachange
-          schemachange -f $GITHUB_WORKSPACE/SNOWFLAKE -a $SF_ACCOUNT -u $SF_USERNAME -r $SF_ROLE -w $SF_WAREHOUSE -d $SF_DATABASE -c $SF_DATABASE.SCHEMACHANGE.CHANGE_HISTORY --create-change-history-table
+          schemachange \
+            -f $GITHUB_WORKSPACE/SNOWFLAKE \
+            -a $SF_ACCOUNT \
+            -u $SF_USERNAME \
+            -r $SF_ROLE \
+            -w $SF_WAREHOUSE \
+            -d $SF_DATABASE \
+            -c $SF_DATABASE.SCHEMACHANGE.CHANGE_HISTORY \
+            --create-change-history-table
