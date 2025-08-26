@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"   # Run only when pushing version tags
+    paths:
+      - 'Database/'
 
 jobs:
   deploy-snowflake-changes-job:
