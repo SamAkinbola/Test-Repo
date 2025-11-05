@@ -2,12 +2,14 @@ name: RUBIX_DW_PROD
 
 on:
   pull_request:
-    types: [closed]   # ✅ Trigger when a PR is closed (merged or not)
-  workflow_dispatch:   # Allow manual trigger
+    types: [closed]   # ✅ Trigger when PR is closed (merged or not)
+  pull_request_target:
+    types: [labeled]  # ✅ Trigger when label is added to PR
+  workflow_dispatch:  # Allow manual trigger
 
 jobs:
   build:
-    # ✅ Run only when PR is merged AND has the label 'Snowflake Prod'
+    # ✅ Run only when PR is merged and has label 'Snowflake Prod'
     if: >
       github.event.pull_request.merged == true &&
       contains(github.event.pull_request.labels.*.name, 'Snowflake Prod')
@@ -35,7 +37,7 @@ jobs:
         run: |
           echo "Identifying changed SQL files"
 
-          # 🟢 Compare merged branch (HEAD) with base branch to find changed SQL files anywhere in repo
+          # 🟢 Compare merged branch (HEAD) with base branch to find changed SQL files anywhere
           BASE_BRANCH=${{ github.event.pull_request.base.ref }}
           git fetch origin $BASE_BRANCH --depth=1
           CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/$BASE_BRANCH...HEAD | grep -i '\.sql$' || true)
@@ -53,9 +55,7 @@ jobs:
         if: steps.changed_files.outputs.changed_files != ''
         run: |
           echo "Deploying changed SQL files"
-
           CHANGED_FILES="${{ steps.changed_files.outputs.changed_files }}"
-
           if [ -z "$CHANGED_FILES" ]; then
             echo "No SQL files to deploy."
             exit 0
