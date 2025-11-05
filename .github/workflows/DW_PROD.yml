@@ -1,46 +1,40 @@
-name: RUBIX_DW_PROD
+name: DW_PROD_TEST1
 
 on:
   pull_request:
-    types: [closed]   # ✅ Trigger when PR is closed (merged or not)
-  pull_request_target:
-    types: [labeled]  # ✅ Trigger when label is added to PR
-  workflow_dispatch:  # Allow manual trigger
+    types: [closed]    # Runs when PR is closed (includes merged)
+  workflow_dispatch:   # Allow manual trigger
 
 jobs:
   build:
-    # ✅ Run only when PR is merged and has label 'Snowflake Prod'
     if: >
       github.event.pull_request.merged == true &&
-      contains(github.event.pull_request.labels.*.name, 'Snowflake Prod')
+      contains(join(fromJson(toJson(github.event.pull_request.labels)).*.name, ','), 'DW_PROD_TEST')
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
       - name: Install SnowSQL
         env:
-          SNOWSQL_PRIVATE_KEY_PASSPHRASE: "${{ secrets.SF_DW_PROD_PRIVATE_KEY_PWD }}"
+          SNOWSQL_PRIVATE_KEY_PASSPHRASE: "${{ secrets.DW_PROD_TEST_PASSPHRASE }}"
         run: |
           curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.3/linux_x86_64/snowsql-1.3.2-linux_x86_64.bash
           SNOWSQL_DEST=~/bin SNOWSQL_LOGIN_SHELL=~/.profile bash snowsql-1.3.2-linux_x86_64.bash
 
-      - name: Prepare user private Key
+      - name: Prepare user private key
         run: |
-          printf '%s\n' "${{ secrets.SF_DW_PROD_USER_PRIVATE_KEY }}" > ./private_key.pem
+          printf '%s\n' "${{ secrets.DW_PROD_TEST_PRIVATE_KEY }}" > ./private_key.pem
 
-      - name: Identify Changed SQL Files
+      - name: Identify changed SQL files
         id: changed_files
         run: |
-          echo "Identifying changed SQL files"
-
-          # 🟢 Compare merged branch (HEAD) with base branch to find changed SQL files anywhere
-          BASE_BRANCH=${{ github.event.pull_request.base.ref }}
-          git fetch origin $BASE_BRANCH --depth=1
-          CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/$BASE_BRANCH...HEAD | grep -i '\.sql$' || true)
+          echo "Identifying changed SQL files..."
+          SQL_DIR="."
+          CHANGED_FILES=$(git diff --name-only --diff-filter=AM HEAD^ HEAD "$SQL_DIR" | grep -i '\.sql$' || true)
 
           if [ -z "$CHANGED_FILES" ]; then
             echo "No new or modified SQL files found. Skipping deployment."
@@ -51,10 +45,10 @@ jobs:
           echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Deploy Changed SQL Files to Snowflake
+      - name: Deploy changed SQL files to Snowflake
         if: steps.changed_files.outputs.changed_files != ''
         run: |
-          echo "Deploying changed SQL files"
+          echo "Deploying changed SQL files..."
           CHANGED_FILES="${{ steps.changed_files.outputs.changed_files }}"
           if [ -z "$CHANGED_FILES" ]; then
             echo "No SQL files to deploy."
@@ -65,13 +59,13 @@ jobs:
             if [ -f "$file" ]; then
               echo "Executing $file..."
               ~/bin/snowsql \
-                -a ${{ secrets.SF_DW_PROD_ACCOUNT }} \
-                -u ${{ secrets.SF_DW_PROD_USER }} \
+                -a ${{ secrets.DW_PROD_TEST_ACCOUNT }} \
+                -u ${{ secrets.DW_PROD_TEST_SVC_ACCOUNT }} \
                 --private-key-path ./private_key.pem \
                 -f "$file" \
-                -d ${{ secrets.SF_DW_PROD_DB }} \
-                -r ${{ secrets.SF_DW_PROD_ROLE }} \
-                -w ${{ secrets.SF_DW_PROD_WH }} || { echo "Failed executing $file"; exit 1; }
+                -d ${{ secrets.DW_PROD_TEST_DB }} \
+                -r ${{ secrets.DW_PROD_TEST_ROLE }} \
+                -w ${{ secrets.DW_PROD_TEST_WH }} || { echo "Failed executing $file"; exit 1; }
             else
               echo "File $file does not exist. Skipping."
             fi
