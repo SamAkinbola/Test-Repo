@@ -2,15 +2,15 @@ name: RUBIX_DW_PROD
 
 on:
   pull_request:
-    types: [closed]   # 🟢 Changed: trigger only when a PR is closed (merged or not)
-  workflow_dispatch:   # Manual trigger still allowed
+    types: [closed]   # ✅ Trigger when a PR is closed (merged or not)
+  workflow_dispatch:   # Allow manual trigger
 
 jobs:
   build:
-    # 🟢 Changed: Run only if PR is merged AND has the label 'DW_PROD'
+    # ✅ Run only when PR is merged AND has the label 'Snowflake Prod'
     if: >
       github.event.pull_request.merged == true &&
-      contains(github.event.pull_request.labels.*.name, 'DW_PROD')
+      contains(github.event.pull_request.labels.*.name, 'Snowflake Prod')
     runs-on: ubuntu-latest
 
     steps:
@@ -35,7 +35,7 @@ jobs:
         run: |
           echo "Identifying changed SQL files"
 
-          # 🟢 Changed: Compare merged PR branch (HEAD) with base branch to find changed SQL files anywhere in the repo
+          # 🟢 Compare merged branch (HEAD) with base branch to find changed SQL files anywhere in repo
           BASE_BRANCH=${{ github.event.pull_request.base.ref }}
           git fetch origin $BASE_BRANCH --depth=1
           CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/$BASE_BRANCH...HEAD | grep -i '\.sql$' || true)
@@ -45,7 +45,6 @@ jobs:
             exit 0
           fi
 
-          # Store the changed files in an output variable
           echo "changed_files<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -55,7 +54,6 @@ jobs:
         run: |
           echo "Deploying changed SQL files"
 
-          # Read changed files from the output
           CHANGED_FILES="${{ steps.changed_files.outputs.changed_files }}"
 
           if [ -z "$CHANGED_FILES" ]; then
@@ -63,7 +61,6 @@ jobs:
             exit 0
           fi
 
-          # Loop through changed SQL files and execute them
           echo "$CHANGED_FILES" | while read file; do
             if [ -f "$file" ]; then
               echo "Executing $file..."
